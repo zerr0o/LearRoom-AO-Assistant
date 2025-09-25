@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
-import type { AuthResponse } from '../types';
+import supabase from '../utils/supabase';
 
 interface AuthPageProps {
   onAuthSuccess: (email: string) => void;
@@ -13,59 +13,50 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const WEBHOOK_URL = 'https://zerr0o.app.n8n.cloud/webhook-test/a4235338-8bba-446e-898a-51a2d2875329';
+  // Removed webhook URL - now using Supabase Auth
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    if (mode === 'login' && !password.trim()) return;
+    if (!password.trim()) return;
 
     setIsLoading(true);
     setMessage(null);
 
     try {
-      // Construire le body de la requête
-      const requestBody: { email: string; password?: string } = { email };
-      if (mode === 'login') {
-        requestBody.password = password;
-      }
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        body: JSON.stringify(requestBody)
-      });
+      if (mode === 'signup') {
+        // Inscription avec Supabase
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
 
-      if (!response.ok) {
-        throw new Error('Erreur de réseau');
-      }
-
-      let data: AuthResponse;
-      try {
-        data = await response.json();
-        console.log(data)
-      } catch (jsonError) {
-        console.error('Erreur parsing JSON:', jsonError);
-        if (jsonError instanceof Error && jsonError.message.includes('Unexpected end of JSON input')) {
-          setMessage({ type: 'error', text: 'Le serveur a renvoyé une réponse vide ou incomplète. Vérifiez la configuration du webhook.' });
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
         } else {
-          setMessage({ type: 'error', text: 'Le serveur n\'a pas renvoyé de réponse d\'authentification valide. Veuillez réessayer ou contacter l\'administrateur.' });
-        }
-        return;
-      }
-
-      if (data.success) {
-        if (mode === 'signup') {
-          setMessage({ type: 'success', text: data.message || 'Email envoyé avec succès' });
+          setMessage({ 
+            type: 'success', 
+            text: 'Email de confirmation envoyé ! Vérifiez votre boîte mail.' 
+          });
           // Basculer vers la connexion après inscription réussie
           setTimeout(() => {
             setMode('login');
             setMessage(null);
-          }, 2000);
-        } else {
+          }, 3000);
+        }
+      } else {
+        // Connexion avec Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+        } else if (data.user) {
           // Connexion réussie
           onAuthSuccess(email);
         }
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Erreur inconnue' });
       }
     } catch (error) {
       console.error('Erreur authentification:', error);
@@ -133,25 +124,23 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
               </div>
             </div>
 
-            {/* Password (only for login) */}
-            {mode === 'login' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mot de passe
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
+            {/* Password (required for both login and signup) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mot de passe
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  required
+                />
               </div>
-            )}
+            </div>
 
             {/* Message */}
             {message && (
@@ -172,7 +161,7 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !email.trim() || (mode === 'login' && !password.trim())}
+              disabled={isLoading || !email.trim() || !password.trim()}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-medium"
             >
               {isLoading ? (
