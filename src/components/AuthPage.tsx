@@ -14,6 +14,7 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isRecovery, setIsRecovery] = useState(false);
+  const [displayName, setDisplayName] = useState('');
 
   // Removed webhook URL - now using Supabase Auth
 
@@ -37,6 +38,10 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
       setMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
       return;
     }
+    if (mode === 'signup' && !displayName.trim()) {
+      setMessage({ type: 'error', text: 'Veuillez saisir un nom d\'affichage.' });
+      return;
+    }
 
     setIsLoading(true);
     setMessage(null);
@@ -58,6 +63,9 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
+          options: {
+            data: { full_name: displayName.trim() }
+          }
         });
 
         if (error) {
@@ -115,6 +123,37 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
         {/* Auth Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          {/* OAuth Providers */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  setMessage(null);
+                  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo }
+                  });
+                  if (error) setMessage({ type: 'error', text: error.message });
+                } catch (err) {
+                  setMessage({ type: 'error', text: 'Erreur lors de la connexion Google.' });
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              className="w-full border border-gray-200 text-gray-700 py-2.5 px-4 rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-2 text-sm"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+              Continuer avec Google
+            </button>
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px bg-gray-200 flex-1" />
+              <span className="text-xs text-gray-400">ou</span>
+              <div className="h-px bg-gray-200 flex-1" />
+            </div>
+          </div>
           {/* Mode Toggle */}
           <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
             <button
@@ -141,6 +180,25 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Display Name (signup only) */}
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom d'affichage
+                </label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="Votre nom"
+                    required
+                  />
+                </div>
+              </div>
+            )}
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -175,8 +233,8 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
                   required
                 />
               </div>
-              {/* Password complexity checklist */}
-              {((mode === 'signup' || isRecovery) || password.length > 0) && (
+              {/* Password complexity checklist (hidden in login mode) */}
+              {(mode === 'signup' || isRecovery) && (
                 (() => {
                   const rules = {
                     length: password.length >= 8,
@@ -251,7 +309,8 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
                 const strong = Object.values(rules).every(Boolean);
                 const needsStrong = (mode === 'signup' || isRecovery);
                 const mismatch = (mode === 'signup' || isRecovery) && password !== confirmPassword;
-                return isLoading || !email.trim() || !password.trim() || mismatch || (needsStrong && !strong);
+                const missingName = mode === 'signup' && !displayName.trim();
+                return isLoading || !email.trim() || !password.trim() || mismatch || (needsStrong && !strong) || missingName;
               })()}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-medium"
             >
