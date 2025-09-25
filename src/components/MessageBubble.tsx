@@ -51,29 +51,29 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   };
 
   return (
-    <div className={`flex gap-3 mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex gap-2 lg:gap-3 mb-4 lg:mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-          <Bot className="w-4 h-4 text-white" />
+        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+          <Bot className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
         </div>
       )}
       
-      <div className={`max-w-[80%] ${isUser ? 'order-first' : ''}`}>
+      <div className={`max-w-[90%] sm:max-w-[80%] ${isUser ? 'order-first' : ''}`}>
         <div
-          className={`px-4 py-3 rounded-2xl ${
+          className={`px-3 lg:px-4 py-2 lg:py-3 rounded-2xl ${
             isUser
               ? 'bg-blue-600 text-white rounded-br-md'
               : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
           }`}
         >
-          <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+          <div className="text-xs lg:text-sm leading-relaxed prose prose-sm max-w-none">
             {isUser ? (
               <div className="whitespace-pre-wrap text-white">
                 {message.content}
               </div>
             ) : (
               <div 
-                className="text-gray-900 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-2 [&_p]:last:mb-0 [&_ul]:mb-2 [&_ul]:pl-4 [&_ol]:mb-2 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-gray-100 [&_pre]:p-2 [&_pre]:rounded [&_pre]:mt-2 [&_pre]:mb-2 [&_pre]:overflow-x-auto [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_strong]:font-bold [&_em]:italic [&_a]:text-blue-600 [&_a]:underline"
+                className="text-gray-900 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-2 [&_p]:last:mb-0 [&_ul]:mb-2 [&_ul]:pl-4 [&_ol]:mb-2 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-gray-100 [&_pre]:p-2 [&_pre]:rounded [&_pre]:mt-2 [&_pre]:mb-2 [&_pre]:overflow-x-auto [&_h1]:text-base lg:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-sm lg:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-xs lg:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_strong]:font-bold [&_em]:italic [&_a]:text-blue-600 [&_a]:underline"
                 dangerouslySetInnerHTML={{ __html: processContentWithMarkdown(message.content) }}
                 onClick={handleCitationClick}
               />
@@ -86,9 +86,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </div>
 
         {message.citations && message.citations.length > 0 && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <h4 className="text-xs font-bold text-gray-700 mb-2">Sources</h4>
-            <div className="space-y-2">
+          <div className="mt-2 lg:mt-3 p-2 lg:p-3 bg-gray-50 rounded-lg">
+            <h4 className="text-xs font-bold text-gray-700 mb-1 lg:mb-2">Sources</h4>
+            <div className="space-y-1 lg:space-y-2">
               {message.citations.map((citation, index) => (
                 <div key={citation.id} className="text-xs text-gray-600">
                   <span className="font-bold">[{index + 1}]</span> {citation.text}
@@ -103,8 +103,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
 
       {isUser && (
-        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-          <User className="w-4 h-4 text-gray-600" />
+        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+          <User className="w-3 h-3 lg:w-4 lg:h-4 text-gray-600" />
         </div>
       )}
     </div>

@@ -13,7 +13,7 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const WEBHOOK_URL = 'https://zerr0o.app.n8n.cloud/webhook/a4235338-8bba-446e-898a-51a2d2875329';
+  const WEBHOOK_URL = 'https://zerr0o.app.n8n.cloud/webhook-test/a4235338-8bba-446e-898a-51a2d2875329';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

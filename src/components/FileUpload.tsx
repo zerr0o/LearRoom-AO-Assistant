@@ -135,9 +135,9 @@ export function FileUpload({ onFileUpload, onFilesUpload, documents, isUploading
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 lg:space-y-4">
       <div
-        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+        className={`border-2 border-dashed rounded-xl p-4 lg:p-6 text-center transition-all cursor-pointer ${
           dragOver
             ? 'border-blue-400 bg-blue-50'
             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
@@ -146,27 +146,27 @@ export function FileUpload({ onFileUpload, onFilesUpload, documents, isUploading
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <div className="flex items-center justify-center gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mb-3 lg:mb-4">
           <button
             onClick={() => handleModeSwitch('file')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm lg:text-base"
             disabled={isUploading}
           >
             <FileText className="w-4 h-4" />
-            Fichier(s)
+            <span className="text-sm lg:text-base">Fichier(s)</span>
           </button>
           <button
             onClick={() => handleModeSwitch('folder')}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm lg:text-base"
             disabled={isUploading}
           >
             <Folder className="w-4 h-4" />
-            Dossier
+            <span className="text-sm lg:text-base">Dossier</span>
           </button>
         </div>
         
-        <Upload className={`w-8 h-8 mx-auto mb-2 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
-        
+        <Upload className={`w-6 h-6 lg:w-8 lg:h-8 mx-auto mb-2 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+        <p className="text-xs lg:text-sm text-gray-500">Glissez-déposez ou cliquez pour sélectionner</p>
       </div>
 
       {/* Input pour fichiers individuels */}
@@ -192,8 +192,8 @@ export function FileUpload({ onFileUpload, onFilesUpload, documents, isUploading
 
       {/* Progress indicator */}
       {isUploading && uploadProgress && (
-        <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Traitement en cours</h4>
+        <div className="mt-3 lg:mt-4 p-3 lg:p-4 bg-white border border-gray-200 rounded-lg">
+          <h4 className="text-xs lg:text-sm font-semibold text-gray-700 mb-2 lg:mb-3">Traitement en cours</h4>
           <UploadProgress 
             steps={uploadProgress.steps}
             currentStep={uploadProgress.currentStep}
@@ -204,30 +204,32 @@ export function FileUpload({ onFileUpload, onFilesUpload, documents, isUploading
 
       {documents.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">Documents uploadés</h4>
-          {documents.map((doc) => (
-            <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <File className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                  {getFileExtension(doc.name)}
-                </span>
+          <h4 className="text-xs lg:text-sm font-medium text-gray-700">Documents uploadés</h4>
+          <div className="max-h-48 overflow-y-auto space-y-2">
+            {documents.map((doc) => (
+              <div key={doc.id} className="flex items-center gap-2 lg:gap-3 p-2 lg:p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-1 lg:gap-2">
+                  <File className="w-3 h-3 lg:w-4 lg:h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-xs bg-gray-200 text-gray-700 px-1 lg:px-2 py-0.5 lg:py-1 rounded">
+                    {getFileExtension(doc.name)}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs lg:text-sm font-medium text-gray-900 truncate">{doc.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {doc.size > 1024 * 1024 
+                      ? `${(doc.size / (1024 * 1024)).toFixed(1)} MB` 
+                      : `${(doc.size / 1024).toFixed(1)} KB`} • {doc.uploadedAt.toLocaleDateString()}
+                  </p>
+                </div>
+                {doc.vectorized ? (
+                  <Check className="w-3 h-3 lg:w-4 lg:h-4 text-green-600 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3 h-3 lg:w-4 lg:h-4 text-orange-500 flex-shrink-0" />
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
-                <p className="text-xs text-gray-500">
-                  {doc.size > 1024 * 1024 
-                    ? `${(doc.size / (1024 * 1024)).toFixed(1)} MB` 
-                    : `${(doc.size / 1024).toFixed(1)} KB`} • {doc.uploadedAt.toLocaleDateString()}
-                </p>
-              </div>
-              {doc.vectorized ? (
-                <Check className="w-4 h-4 text-green-600" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-orange-500" />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

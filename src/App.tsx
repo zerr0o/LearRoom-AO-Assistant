@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, LogOut, MessageCircle } from 'lucide-react';
+import { Settings, LogOut, MessageCircle, Menu, X } from 'lucide-react';
 import { AuthPage } from './components/AuthPage';
 import { ConversationsList } from './components/ConversationsList';
 import { ChatInterface } from './components/ChatInterface';
@@ -17,6 +17,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ conversationId: string; title: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     steps: Array<{ id: string; label: string; status: 'pending' | 'active' | 'completed' | 'error'; icon: React.ReactNode }>;
     currentStep?: string;
@@ -51,6 +52,8 @@ function App() {
 
   const selectConversation = (id: string) => {
     setActiveConversationId(id);
+    // Fermer le menu mobile après sélection
+    setIsMobileMenuOpen(false);
   };
 
   const deleteConversation = (id: string) => {
@@ -308,21 +311,45 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <ConversationsList
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        onSelectConversation={selectConversation}
-        onCreateConversation={createConversation}
-        onDeleteConversation={deleteConversation}
-      />
+    <div className="flex h-screen bg-gray-50 relative">
+      {/* Overlay pour mobile */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar - responsive */}
+      <div className={`${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0 fixed lg:relative z-50 lg:z-auto transition-transform duration-300 h-full`}>
+        <ConversationsList
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={selectConversation}
+          onCreateConversation={createConversation}
+          onDeleteConversation={deleteConversation}
+          onClose={() => setIsMobileMenuOpen(false)}
+          isMobile={isMobileMenuOpen}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 px-6 py-3">
+        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">AO Assistant</h1>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">Connecté: {user.email}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
+                title="Menu"
+              >
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+              <h1 className="text-lg lg:text-xl font-semibold text-gray-900">AO Assistant</h1>
+            </div>
+            <div className="flex items-center gap-2 lg:gap-4">
+              <span className="hidden sm:inline text-sm text-gray-600 truncate max-w-[150px] lg:max-w-none">{user.email}</span>
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"

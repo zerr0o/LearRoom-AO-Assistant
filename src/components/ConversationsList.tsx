@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Plus, Calendar, Trash2 } from 'lucide-react';
+import { MessageCircle, Plus, Calendar, Trash2, X } from 'lucide-react';
 import type { Conversation } from '../types';
 
 interface ConversationsListProps {
@@ -8,6 +8,8 @@ interface ConversationsListProps {
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void;
   onDeleteConversation: (id: string) => void;
+  onClose?: () => void;
+  isMobile?: boolean;
 }
 
 export function ConversationsList({
@@ -15,17 +17,34 @@ export function ConversationsList({
   activeConversationId,
   onSelectConversation,
   onCreateConversation,
-  onDeleteConversation
+  onDeleteConversation,
+  onClose,
+  isMobile
 }: ConversationsListProps) {
   const sortedConversations = [...conversations].sort(
     (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
   );
 
   return (
-    <div className="w-80 h-full bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-full sm:w-80 h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-3 lg:hidden">
+          <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Fermer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
         <button
-          onClick={onCreateConversation}
+          onClick={() => {
+            onCreateConversation();
+            if (onClose && isMobile) onClose();
+          }}
           className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />

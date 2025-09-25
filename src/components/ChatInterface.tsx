@@ -86,31 +86,31 @@ export function ChatInterface({
   return (
     <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-white border-b border-gray-200 p-3 lg:p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-gray-900">{conversation.title}</h2>
-            <p className="text-sm text-gray-500">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-gray-900 text-sm lg:text-base truncate">{conversation.title}</h2>
+            <p className="text-xs lg:text-sm text-gray-500">
               {conversation.messages.length} messages • {conversation.documents.length} documents
             </p>
           </div>
           <button
             onClick={() => setShowFileUpload(!showFileUpload)}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors flex-shrink-0 ml-2 ${
               showFileUpload
                 ? 'bg-blue-100 text-blue-600'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
             title="Gérer les documents"
           >
-            <Paperclip className="w-5 h-5" />
+            <Paperclip className="w-4 h-4 lg:w-5 lg:h-5" />
           </button>
         </div>
       </div>
 
       {/* File Upload Panel */}
       {showFileUpload && (
-        <div className="bg-white border-b border-gray-200 p-4">
+        <div className="bg-white border-b border-gray-200 p-3 lg:p-4 max-h-[50vh] overflow-y-auto">
           <FileUpload
             onFileUpload={onUploadFile}
             onFilesUpload={onUploadFiles}
@@ -122,7 +122,7 @@ export function ChatInterface({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-3 lg:p-4 min-h-0">
         <div className="max-w-4xl mx-auto">
           {conversation.messages.length === 0 ? (
             <div className="text-center py-12">
@@ -162,9 +162,9 @@ export function ChatInterface({
       </div>
 
       {/* Input */}
-      <div className="bg-white border-t border-gray-200 p-4">
+      <div className="bg-white border-t border-gray-200 p-3 lg:p-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex gap-3 items-end">
+          <div className="flex gap-2 lg:gap-3 items-end">
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef}
@@ -172,7 +172,7 @@ export function ChatInterface({
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Tapez votre message..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none max-h-32 transition-all"
+                className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-200 rounded-xl lg:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none max-h-32 transition-all"
                 rows={1}
                 disabled={isLoading}
               />
@@ -180,12 +180,12 @@ export function ChatInterface({
             <button
               onClick={handleSend}
               disabled={!message.trim() || isLoading}
-              className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              className="p-2 lg:p-3 bg-blue-600 text-white rounded-xl lg:rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
               ) : (
-                <Send className="w-5 h-5" />
+                <Send className="w-4 h-4 lg:w-5 lg:h-5" />
               )}
             </button>
           </div>
