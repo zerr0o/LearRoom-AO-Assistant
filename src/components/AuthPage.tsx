@@ -12,19 +12,48 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isRecovery, setIsRecovery] = useState(false);
 
   // Removed webhook URL - now using Supabase Auth
+
+  // Detect recovery (password reset) link
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      if (hash.includes('type=recovery')) {
+        setIsRecovery(true);
+        setMode('login');
+        setMessage({ type: 'success', text: 'Veuillez saisir un nouveau mot de passe.' });
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     if (!password.trim()) return;
+    if (mode === 'signup' && password !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
+      return;
+    }
 
     setIsLoading(true);
     setMessage(null);
 
     try {
-      if (mode === 'signup') {
+      if (isRecovery) {
+        // User came from recovery link: update password
+        const { error } = await supabase.auth.updateUser({ password: password.trim() });
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+        } else {
+          setMessage({ type: 'success', text: 'Mot de passe mis à jour. Vous pouvez maintenant vous connecter.' });
+          setIsRecovery(false);
+          setPassword('');
+          setConfirmPassword('');
+        }
+      } else if (mode === 'signup') {
         // Inscription avec Supabase
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
@@ -32,7 +61,13 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
         });
 
         if (error) {
-          setMessage({ type: 'error', text: error.message });
+          // If user already exists
+          const msg = error.message || '';
+          if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('user already')) {
+            setMessage({ type: 'error', text: 'Un compte existe déjà avec cet email. Utilisez la connexion ou réinitialisez votre mot de passe.' });
+          } else {
+            setMessage({ type: 'error', text: error.message });
+          }
         } else {
           setMessage({ 
             type: 'success', 
@@ -142,6 +177,26 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
               </div>
             </div>
 
+            {/* Confirm Password (signup or recovery) */}
+            {(mode === 'signup' || isRecovery) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmez le mot de passe
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Message */}
             {message && (
               <div className={`p-3 rounded-lg flex items-center gap-2 ${
@@ -161,18 +216,56 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !email.trim() || !password.trim()}
+              disabled={
+                isLoading ||
+                !email.trim() ||
+                !password.trim() ||
+                ((mode === 'signup' || isRecovery) && password !== confirmPassword)
+              }
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-medium"
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  {mode === 'login' ? 'Se connecter' : 'S\'inscrire'}
+                  {isRecovery ? 'Mettre à jour le mot de passe' : mode === 'login' ? 'Se connecter' : 'S\'inscrire'}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
+
+            {/* Forgot password link (login mode) */}
+            {!isRecovery && mode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={async () => {
+                    if (!email.trim()) {
+                      setMessage({ type: 'error', text: 'Veuillez saisir votre email pour réinitialiser le mot de passe.' });
+                      return;
+                    }
+                    setIsLoading(true);
+                    setMessage(null);
+                    try {
+                      const redirectTo = `${window.location.origin}${window.location.pathname}`; // revient sur la même page
+                      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+                      if (error) {
+                        setMessage({ type: 'error', text: error.message });
+                      } else {
+                        setMessage({ type: 'success', text: 'Email de réinitialisation envoyé. Vérifiez votre boîte mail.' });
+                      }
+                    } catch (err) {
+                      setMessage({ type: 'error', text: 'Erreur lors de la demande de réinitialisation.' });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Info Text */}
