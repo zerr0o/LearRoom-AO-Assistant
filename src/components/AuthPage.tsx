@@ -175,6 +175,27 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
                   required
                 />
               </div>
+              {/* Password complexity checklist */}
+              {((mode === 'signup' || isRecovery) || password.length > 0) && (
+                (() => {
+                  const rules = {
+                    length: password.length >= 8,
+                    lower: /[a-z]/.test(password),
+                    upper: /[A-Z]/.test(password),
+                    number: /[0-9]/.test(password),
+                    special: /[^A-Za-z0-9]/.test(password),
+                  };
+                  return (
+                    <ul className="mt-2 space-y-1 text-xs">
+                      <li className={rules.length ? 'text-green-600' : 'text-gray-500'}>• Au moins 8 caractères</li>
+                      <li className={rules.lower ? 'text-green-600' : 'text-gray-500'}>• Une lettre minuscule</li>
+                      <li className={rules.upper ? 'text-green-600' : 'text-gray-500'}>• Une lettre majuscule</li>
+                      <li className={rules.number ? 'text-green-600' : 'text-gray-500'}>• Un chiffre</li>
+                      <li className={rules.special ? 'text-green-600' : 'text-gray-500'}>• Un caractère spécial</li>
+                    </ul>
+                  );
+                })()
+              )}
             </div>
 
             {/* Confirm Password (signup or recovery) */}
@@ -194,6 +215,9 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
                     required
                   />
                 </div>
+                {confirmPassword.length > 0 && password !== confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">Les mots de passe ne correspondent pas.</p>
+                )}
               </div>
             )}
 
@@ -216,12 +240,19 @@ export function AuthPage({ onAuthSuccess }: AuthPageProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={
-                isLoading ||
-                !email.trim() ||
-                !password.trim() ||
-                ((mode === 'signup' || isRecovery) && password !== confirmPassword)
-              }
+              disabled={(() => {
+                const rules = {
+                  length: password.length >= 8,
+                  lower: /[a-z]/.test(password),
+                  upper: /[A-Z]/.test(password),
+                  number: /[0-9]/.test(password),
+                  special: /[^A-Za-z0-9]/.test(password),
+                };
+                const strong = Object.values(rules).every(Boolean);
+                const needsStrong = (mode === 'signup' || isRecovery);
+                const mismatch = (mode === 'signup' || isRecovery) && password !== confirmPassword;
+                return isLoading || !email.trim() || !password.trim() || mismatch || (needsStrong && !strong);
+              })()}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-medium"
             >
               {isLoading ? (

@@ -8,6 +8,7 @@ import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useOpenAI } from './hooks/useOpenAI';
 import type { Conversation, Message, UploadedDocument, AppSettings } from './types';
+import supabase from './utils/supabase';
 
 function App() {
   const [user, setUser] = useState<{ email: string; isAuthenticated: boolean } | null>(null);
@@ -32,8 +33,12 @@ function App() {
     setUser({ email, isAuthenticated: true });
   };
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+    }
   };
 
   const createConversation = () => {
@@ -305,6 +310,32 @@ function App() {
       });
     }
   }, [activeConversation?.id, syncConversationDocuments]);
+
+  // Supabase auth session handling
+  useEffect(() => {
+    let isMounted = true;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      const email = session?.user?.email || null;
+      if (email) {
+        setUser({ email, isAuthenticated: true });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const email = session?.user?.email || null;
+      if (email) {
+        setUser({ email, isAuthenticated: true });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   if (!user?.isAuthenticated) {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
