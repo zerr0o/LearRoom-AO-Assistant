@@ -1,0 +1,39 @@
+# Configuration Apache pour les types MIME
+AddType text/css .css
+AddType application/javascript .js
+AddType application/json .json
+AddType image/svg+xml .svg
+AddType image/png .png
+AddType image/jpeg .jpg .jpeg
+AddType image/gif .gif
+AddType image/webp .webp
+AddType font/woff2 .woff2
+AddType font/woff .woff
+AddType font/ttf .ttf
+
+# Headers de sécurité et cache
+<IfModule mod_headers.c>
+    # MIME type headers
+    <FilesMatch "\.(css)$">
+        Header set Content-Type "text/css; charset=utf-8"
+    </FilesMatch>
+    
+    <FilesMatch "\.(js)$">
+        Header set Content-Type "application/javascript; charset=utf-8"
+    </FilesMatch>
+    
+    # Cache headers
+    <FilesMatch "\.(css|js|png|jpg|jpeg|gif|svg|ico|woff2|woff|ttf)$">
+        Header set Cache-Control "public, max-age=31536000"
+    </FilesMatch>
+</IfModule>
+
+# Fallback pour les applications SPA
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteRule ^index\.html$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /index.html [L]
+</IfModule>
