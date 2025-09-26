@@ -154,13 +154,23 @@ export function useN8NChat() {
         throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
       }
 
-      console.log(`📄 Upload ${documentType} vers N8N:`, file.name);
+      // Calculer la taille en KB
+      const documentSizeKB = Math.round(file.size / 1024);
+      
+      console.log(`📄 Upload ${documentType} vers N8N:`, {
+        name: file.name,
+        size: `${documentSizeKB} KB`,
+        type: file.type,
+        conversationId: conversationId || 'N/A'
+      });
       
       // Préparer FormData pour l'upload
       const formData = new FormData();
       formData.append('file', file);
       formData.append('user_id', userId);
       formData.append('document_type', documentType);
+      formData.append('document_size', documentSizeKB.toString());
+      formData.append('document_name', file.name);
       
       // Ajouter conversationId si fourni (pour les documents de projet)
       if (conversationId) {
