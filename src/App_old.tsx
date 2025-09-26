@@ -58,6 +58,7 @@ function App() {
 
   const selectConversation = (id: string) => {
     setActiveConversationId(id);
+    // Fermer le menu mobile après sélection
     setIsMobileMenuOpen(false);
   };
 
@@ -73,6 +74,12 @@ function App() {
       setConversations(prev => prev.filter(c => c.id !== deleteDialog.conversationId));
       if (activeConversationId === deleteDialog.conversationId) {
         setActiveConversationId(null);
+      }
+      setDeleteDialog(null);
+    }
+  };
+
+{{ ... }}
       }
       setDeleteDialog(null);
     }
@@ -106,37 +113,6 @@ function App() {
       timestamp: new Date()
     };
     setStreamingMessage(streamingMsg);
-
-    try {
-      const response = await sendMessage(
-        message,
-        activeConversation.messages,
-        documents,
-        activeConversation.vectorStoreId,
-        (streamContent: string) => {
-          // Callback de mise à jour du streaming
-          setStreamingMessage(prev => prev ? { ...prev, content: streamContent } : null);
-        }
-      );
-
-      // Remplacer le message de streaming par la réponse finale
-      setStreamingMessage(null);
-      setConversations(prev =>
-        prev.map(c =>
-          c.id === activeConversation.id
-            ? { ...c, messages: [...c.messages, userMessage, response], updatedAt: new Date() }
-            : c
-        )
-      );
-    } catch (error) {
-      console.error('Erreur envoi message:', error);
-      setStreamingMessage(null);
-      throw error;
-    }
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!activeConversation) return;
 
     setIsUploading(true);
     setUploadProgress({
@@ -357,12 +333,6 @@ function App() {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
 
-  // Créer une conversation étendue avec le message de streaming
-  const conversationWithStreaming = activeConversation && streamingMessage ? {
-    ...activeConversation,
-    messages: [...activeConversation.messages, streamingMessage]
-  } : activeConversation;
-
   return (
     <div className="flex h-screen bg-gray-50 relative">
       {/* Overlay pour mobile */}
@@ -422,7 +392,7 @@ function App() {
         </header>
 
         <ChatInterface
-          conversation={conversationWithStreaming}
+          conversation={activeConversation}
           onSendMessage={handleSendMessage}
           onUploadFile={handleFileUpload}
           onUploadFiles={handleFilesUpload}
