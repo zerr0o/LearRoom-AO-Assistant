@@ -27,7 +27,7 @@ export function useN8NChat() {
       console.log('🚀 Envoi du message vers N8N endpoint avec sessionId:', sessionId);
 
       // Faire la requête avec streaming (POST avec body JSON)
-      const response = await fetch('https://zerr0o.app.n8n.cloud/webhook/8a5c9f7b-f0a8-4603-9e07-242221f6add1/chat', {
+      const response = await fetch('https://n8n.srv1030728.hstgr.cloud/webhook/8a5c9f7b-f0a8-4603-9e07-242221f6add1/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ export function useN8NChat() {
       }
 
       // Faire la requête d'upload
-      const response = await fetch('https://zerr0o.app.n8n.cloud/webhook/upload-to-ai', {
+      const response = await fetch('https://n8n.srv1030728.hstgr.cloud/webhook/upload-to-ai', {
         method: 'POST',
         body: formData
       });
