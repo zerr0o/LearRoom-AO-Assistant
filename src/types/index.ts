@@ -36,6 +36,7 @@ export interface UploadedDocument {
   content?: string;
   fileId?: string;
   vectorStoreFileId?: string;
+  documentType?: 'project_doc' | 'user_doc';
 }
 
 export interface AppSettings {
@@ -51,4 +52,5 @@ export interface AuthResponse {
 export interface User {
   email: string;
   isAuthenticated: boolean;
+  userDocuments?: UploadedDocument[];
 }

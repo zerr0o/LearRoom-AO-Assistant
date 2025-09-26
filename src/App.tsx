@@ -3,7 +3,7 @@ import { Settings, LogOut, MessageCircle, Menu, X } from 'lucide-react';
 import { AuthPage } from './components/AuthPage';
 import { ConversationsList } from './components/ConversationsList';
 import { ChatInterface } from './components/ChatInterface';
-import { SettingsMenu } from './components/SettingsMenu';
+import { ProfileMenu } from './components/ProfileMenu';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useN8NChat } from './hooks/useN8NChat';
@@ -25,8 +25,9 @@ function App() {
     error?: string;
   } | undefined>();
   const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
+  const [userDocuments, setUserDocuments] = useLocalStorage<UploadedDocument[]>('userDocuments', []);
 
-  const { sendMessage, vectorizeDocument, syncConversationDocuments, isLoading } = useN8NChat();
+  const { sendMessage, vectorizeDocument, uploadDocument, syncConversationDocuments, isLoading } = useN8NChat();
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
 
@@ -116,7 +117,8 @@ function App() {
         (streamContent: string) => {
           // Callback de mise à jour du streaming
           setStreamingMessage(prev => prev ? { ...prev, content: streamContent } : null);
-        }
+        },
+        activeConversation.id
       );
 
       // Remplacer le message de streaming par la réponse finale
@@ -177,7 +179,8 @@ function App() {
           uploadedAt: new Date(),
           vectorized: true,
           content: result.content,
-          fileId: result.fileId
+          fileId: result.fileId,
+          documentType: 'project_doc'
         };
 
         const updatedConversation = {
@@ -260,7 +263,8 @@ function App() {
             uploadedAt: new Date(),
             vectorized: true,
             content: result.content,
-            fileId: result.fileId
+            fileId: result.fileId,
+            documentType: 'project_doc'
           };
           
           uploadedDocs.push(newDocument);
@@ -309,6 +313,86 @@ function App() {
 
   const updateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
+  };
+
+  const handleUploadUserDocument = async (file: File) => {
+    setIsUploading(true);
+    setUploadProgress({
+      steps: [
+        { id: 'upload', label: 'Upload du document utilisateur', status: 'active', icon: <MessageCircle className="w-4 h-4" /> },
+        { id: 'process', label: 'Traitement et indexation', status: 'pending', icon: <MessageCircle className="w-4 h-4" /> },
+        { id: 'complete', label: 'Document ajouté au profil', status: 'pending', icon: <MessageCircle className="w-4 h-4" /> }
+      ],
+      currentStep: 'upload'
+    });
+
+    try {
+      setUploadProgress(prev => prev ? {
+        ...prev,
+        steps: prev.steps.map(s => 
+          s.id === 'upload' ? { ...s, status: 'completed' } :
+          s.id === 'process' ? { ...s, status: 'active' } : s
+        ),
+        currentStep: 'process'
+      } : prev);
+
+      const result = await uploadDocument(file, 'user_doc');
+      
+      if (result.success) {
+        setUploadProgress(prev => prev ? {
+          ...prev,
+          steps: prev.steps.map(s => 
+            s.id === 'process' ? { ...s, status: 'completed' } :
+            s.id === 'complete' ? { ...s, status: 'active' } : s
+          ),
+          currentStep: 'complete'
+        } : prev);
+
+        const newDocument: UploadedDocument = {
+          id: Date.now().toString(),
+          name: file.name,
+          size: file.size,
+          uploadedAt: new Date(),
+          vectorized: true,
+          content: result.content,
+          fileId: result.fileId,
+          documentType: 'user_doc'
+        };
+
+        setUserDocuments(prev => [...prev, newDocument]);
+
+        setUploadProgress(prev => prev ? {
+          ...prev,
+          steps: prev.steps.map(s => ({ ...s, status: 'completed' })),
+          currentStep: undefined
+        } : prev);
+
+        setTimeout(() => {
+          setUploadProgress(undefined);
+        }, 2000);
+      } else {
+        throw new Error(result.content || 'Erreur lors de l\'upload');
+      }
+    } catch (error) {
+      console.error('Erreur upload document utilisateur:', error);
+      setUploadProgress(prev => prev ? {
+        ...prev,
+        steps: prev.steps.map(s => 
+          s.status === 'active' ? { ...s, status: 'error' } : s
+        ),
+        error: error instanceof Error ? error.message : 'Erreur inconnue'
+      } : prev);
+      
+      setTimeout(() => {
+        setUploadProgress(undefined);
+      }, 5000);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteUserDocument = (documentId: string) => {
+    setUserDocuments(prev => prev.filter(doc => doc.id !== documentId));
   };
 
   useEffect(() => {
@@ -433,10 +517,15 @@ function App() {
       </div>
 
       {showSettings && (
-        <SettingsMenu
+        <ProfileMenu
           settings={settings}
+          userDocuments={userDocuments}
           onUpdateSettings={updateSettings}
+          onUploadUserDocument={handleUploadUserDocument}
+          onDeleteUserDocument={handleDeleteUserDocument}
           onClose={() => setShowSettings(false)}
+          isUploading={isUploading}
+          uploadProgress={uploadProgress}
         />
       )}
 

@@ -10,20 +10,21 @@ export function useN8NChat() {
     _conversationHistory: Message[],
     _documents: UploadedDocument[],
     _vectorStoreId?: string,
-    onStreamUpdate?: (content: string) => void
+    onStreamUpdate?: (content: string) => void,
+    conversationId?: string
   ): Promise<Message> => {
     setIsLoading(true);
     
     try {
       // Récupérer l'ID de session Supabase
       const { data: { session } } = await supabase.auth.getSession();
-      const sessionID = session?.user?.id;
+      const sessionId = session?.user?.id;
       
-      if (!sessionID) {
+      if (!sessionId) {
         throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
       }
 
-      console.log('🚀 Envoi du message vers N8N endpoint avec sessionID:', sessionID);
+      console.log('🚀 Envoi du message vers N8N endpoint avec sessionId:', sessionId);
 
       // Faire la requête avec streaming (POST avec body JSON)
       const response = await fetch('https://zerr0o.app.n8n.cloud/webhook/8a5c9f7b-f0a8-4603-9e07-242221f6add1/chat', {
@@ -34,8 +35,9 @@ export function useN8NChat() {
           'Cache-Control': 'no-cache'
         },
         body: JSON.stringify({
-          sessionID: sessionID,
-          chatInput: message
+          sessionId: sessionId,
+          chatInput: message,
+          conversationId: conversationId
         })
       });
 
@@ -135,50 +137,90 @@ export function useN8NChat() {
     }
   };
 
-  // Fonction simplifiée pour la vectorisation (pas d'upload réel)
-  const vectorizeDocument = async (
+  // Upload de document vers N8N
+  const uploadDocument = async (
     file: File,
-    conversationId: string,
-    existingVectorStoreId?: string
+    documentType: 'project_doc' | 'user_doc',
+    conversationId?: string
   ): Promise<{ success: boolean; content?: string; vectorStoreId?: string; fileId?: string; documents?: UploadedDocument[] }> => {
     setIsLoading(true);
     
     try {
-      console.log('📄 Simulation de vectorisation pour:', file.name);
+      // Récupérer l'ID utilisateur Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
       
-      // Simuler un délai de traitement
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const vectorStoreId = existingVectorStoreId || `vs_${conversationId}_${Date.now()}`;
-      const fileId = `file_${Date.now()}`;
-      
-      const simulatedContent = `Document ${file.name} ajouté à la conversation.
-      
-Ce document sera pris en compte par l'assistant IA lors des prochaines interactions.
-Les informations contenues peuvent être interrogées via des requêtes en langage naturel.
+      if (!userId) {
+        throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
+      }
 
+      console.log(`📄 Upload ${documentType} vers N8N:`, file.name);
+      
+      // Préparer FormData pour l'upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('user_id', userId);
+      formData.append('document_type', documentType);
+      
+      // Ajouter conversationId si fourni (pour les documents de projet)
+      if (conversationId) {
+        formData.append('conversation_id', conversationId);
+      }
+
+      // Faire la requête d'upload
+      const response = await fetch('https://zerr0o.app.n8n.cloud/webhook/upload-to-ai', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur upload N8N: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Réponse N8N upload:', result);
+      
+      const vectorStoreId = conversationId ? `vs_${conversationId}_${Date.now()}` : `user_docs_${userId}`;
+      const fileId = result.fileId || `file_${Date.now()}`;
+      
+      const content = `Document ${file.name} uploadé avec succès.
+      
+Type: ${documentType === 'user_doc' ? 'Document utilisateur' : 'Document de projet'}
 Taille: ${(file.size / 1024).toFixed(2)} KB
-Type: ${file.type}
-Ajouté le: ${new Date().toLocaleString()}`;
+Format: ${file.type}
+Ajouté le: ${new Date().toLocaleString()}
 
-      console.log('✅ Document ajouté avec succès');
+${documentType === 'user_doc' 
+  ? 'Ce document sera disponible pour toutes vos conversations.'
+  : 'Ce document est spécifique à cette conversation.'}`;
+
+      console.log('✅ Document uploadé avec succès');
       
       return { 
         success: true, 
-        content: simulatedContent,
+        content: content,
         vectorStoreId: vectorStoreId,
         fileId: fileId
       };
 
     } catch (error) {
-      console.error('❌ Erreur lors de l\'ajout du document:', error);
+      console.error('❌ Erreur lors de l\'upload du document:', error);
       return { 
         success: false, 
-        content: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue lors de l\'ajout du document'}` 
+        content: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue lors de l\'upload du document'}` 
       };
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Fonction de compatibilité pour les documents de projet (conversation)
+  const vectorizeDocument = async (
+    file: File,
+    conversationId: string,
+    existingVectorStoreId?: string
+  ): Promise<{ success: boolean; content?: string; vectorStoreId?: string; fileId?: string; documents?: UploadedDocument[] }> => {
+    return uploadDocument(file, 'project_doc', conversationId);
   };
 
   // Fonction de synchronisation simplifiée
@@ -190,6 +232,7 @@ Ajouté le: ${new Date().toLocaleString()}`;
   return {
     sendMessage,
     vectorizeDocument,
+    uploadDocument,
     syncConversationDocuments,
     isLoading
   };
