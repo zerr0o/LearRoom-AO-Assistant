@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Message, UploadedDocument } from '../types';
+import type { Message, UploadedDocument, Conversation } from '../types';
 import supabase from '../utils/supabase';
 
 export function useN8NChat() {
@@ -223,6 +223,189 @@ ${documentType === 'user_doc'
     return uploadDocument(file, 'project_doc', conversationId);
   };
 
+  // Récupérer toutes les conversations d'un utilisateur depuis N8N
+  const getUserConversations = async (): Promise<{ success: boolean; conversations?: any[]; error?: string }> => {
+    try {
+      // Récupérer l'ID de session Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionId = session?.user?.id;
+      
+      if (!sessionId) {
+        throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
+      }
+
+      console.log('📋 Récupération des conversations utilisateur:', sessionId);
+
+      // Faire la requête pour récupérer les conversations (GET pour éviter CORS preflight)
+      const response = await fetch(`https://n8n.srv1030728.hstgr.cloud/webhook/get-user-conversations?sessionId=${encodeURIComponent(sessionId)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API N8N: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ Conversations récupérées:', data);
+      
+      // La réponse peut être soit un objet conversation unique, soit un tableau, soit un objet avec une propriété conversations
+      let conversations = [];
+      
+      if (Array.isArray(data)) {
+        // Si c'est déjà un tableau
+        conversations = data;
+      } else if (data.conversations && Array.isArray(data.conversations)) {
+        // Si c'est un objet avec une propriété conversations
+        conversations = data.conversations;
+      } else if (data.id) {
+        // Si c'est un objet conversation unique
+        conversations = [data];
+      }
+      
+      return {
+        success: true,
+        conversations: conversations
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des conversations:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la récupération des conversations'
+      };
+    }
+  };
+
+  // Créer une nouvelle conversation sur N8N
+  const createConversation = async (title: string): Promise<{ success: boolean; conversationId?: string; error?: string }> => {
+    try {
+      // Récupérer l'ID de session Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionId = session?.user?.id;
+      
+      if (!sessionId) {
+        throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
+      }
+
+      console.log('➕ Création d\'une nouvelle conversation:', title);
+
+      // Faire la requête pour créer la conversation (GET pour éviter CORS preflight)
+      const response = await fetch(`https://n8n.srv1030728.hstgr.cloud/webhook/create-conversation?sessionId=${encodeURIComponent(sessionId)}&title=${encodeURIComponent(title)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API N8N: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ Conversation créée:', data);
+      
+      return {
+        success: true,
+        conversationId: data.id
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la conversation:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la création de la conversation'
+      };
+    }
+  };
+
+  // Récupérer l'historique de conversation depuis N8N
+  const getConversationHistory = async (conversationId: string): Promise<{ success: boolean; messages?: Array<{ human: string; ai: string }>; messagesCount?: number; error?: string }> => {
+    try {
+      // Récupérer l'ID de session Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionId = session?.user?.id;
+      
+      if (!sessionId) {
+        throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
+      }
+
+      console.log('📚 Récupération de l\'historique de conversation:', conversationId);
+
+      // Faire la requête pour récupérer l'historique (GET pour éviter CORS preflight)
+      const response = await fetch(`https://n8n.srv1030728.hstgr.cloud/webhook/get-conversation-memory?sessionId=${encodeURIComponent(sessionId)}&conversationId=${encodeURIComponent(conversationId)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API N8N: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ Historique récupéré:', data);
+      
+      return {
+        success: true,
+        messages: data.messages || [],
+        messagesCount: data.messagesCount || 0
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération de l\'historique:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la récupération de l\'historique'
+      };
+    }
+  };
+
+  // Convertir l'historique N8N au format de l'application
+  const convertN8NHistoryToMessages = (n8nMessages: Array<{ human: string; ai: string }>): Message[] => {
+    const messages: Message[] = [];
+    const baseTimestamp = Date.now();
+    
+    n8nMessages.forEach((msgPair, index) => {
+      // Message utilisateur - ID unique avec index et offset
+      messages.push({
+        id: `user-${index}-${baseTimestamp}-${index * 2}`,
+        content: msgPair.human,
+        role: 'user',
+        timestamp: new Date(baseTimestamp + index * 2)
+      });
+      
+      // Message assistant - ID unique avec index et offset différent
+      messages.push({
+        id: `assistant-${index}-${baseTimestamp}-${index * 2 + 1}`,
+        content: msgPair.ai,
+        role: 'assistant',
+        timestamp: new Date(baseTimestamp + index * 2 + 1)
+      });
+    });
+    
+    return messages;
+  };
+
+  // Convertir les conversations N8N au format de l'application
+  const convertN8NConversationsToApp = (n8nConversations: any[]): Conversation[] => {
+    return n8nConversations.map((n8nConv) => ({
+      id: n8nConv.id || n8nConv.conversationId,
+      title: n8nConv.title || 'Nouvelle conversation',
+      messages: n8nConv.messages ? convertN8NHistoryToMessages(n8nConv.messages) : [],
+      createdAt: n8nConv.created_at ? new Date(n8nConv.created_at) : (n8nConv.createdAt ? new Date(n8nConv.createdAt) : new Date()),
+      updatedAt: n8nConv.updated_at ? new Date(n8nConv.updated_at) : (n8nConv.updatedAt ? new Date(n8nConv.updatedAt) : new Date()),
+      documents: n8nConv.documents || [],
+      vectorStoreId: n8nConv.vectorStoreId
+    }));
+  };
+
   // Fonction de synchronisation simplifiée
   const syncConversationDocuments = async (conversation: any): Promise<UploadedDocument[]> => {
     // Retourner les documents existants (pas de sync réelle avec N8N)
@@ -233,6 +416,11 @@ ${documentType === 'user_doc'
     sendMessage,
     vectorizeDocument,
     uploadDocument,
+    getUserConversations,
+    createConversation,
+    getConversationHistory,
+    convertN8NHistoryToMessages,
+    convertN8NConversationsToApp,
     syncConversationDocuments,
     isLoading
   };

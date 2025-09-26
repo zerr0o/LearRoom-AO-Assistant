@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Paperclip } from 'lucide-react';
+import { Send, Loader2, Paperclip, RotateCcw } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { FileUpload } from './FileUpload';
-import type { Conversation, Message, UploadedDocument } from '../types';
+import type { Conversation, UploadedDocument } from '../types';
 
 interface ChatInterfaceProps {
   conversation: Conversation | null;
   onSendMessage: (message: string, documents: UploadedDocument[]) => Promise<void>;
   onUploadFile: (file: File) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
+  onSyncHistory?: (conversationId: string) => Promise<void>;
   isLoading: boolean;
   isUploading: boolean;
   uploadProgress?: {
@@ -23,12 +24,14 @@ export function ChatInterface({
   onSendMessage,
   onUploadFile,
   onUploadFiles,
+  onSyncHistory,
   isLoading,
   isUploading,
   uploadProgress
 }: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [isSyncingHistory, setIsSyncingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -64,6 +67,19 @@ export function ChatInterface({
     }
   };
 
+  const handleSyncHistory = async () => {
+    if (!conversation || !onSyncHistory || isSyncingHistory) return;
+    
+    setIsSyncingHistory(true);
+    try {
+      await onSyncHistory(conversation.id);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+    } finally {
+      setIsSyncingHistory(false);
+    }
+  };
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -94,17 +110,33 @@ export function ChatInterface({
               {conversation.messages.length} messages • {conversation.documents.length} documents
             </p>
           </div>
-          <button
-            onClick={() => setShowFileUpload(!showFileUpload)}
-            className={`p-2 rounded-lg transition-colors flex-shrink-0 ml-2 ${
-              showFileUpload
-                ? 'bg-blue-100 text-blue-600'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title="Gérer les documents"
-          >
-            <Paperclip className="w-4 h-4 lg:w-5 lg:h-5" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            {onSyncHistory && (
+              <button
+                onClick={handleSyncHistory}
+                disabled={isSyncingHistory}
+                className="p-2 rounded-lg transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+                title="Synchroniser l'historique depuis N8N"
+              >
+                {isSyncingHistory ? (
+                  <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4 lg:w-5 lg:h-5" />
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => setShowFileUpload(!showFileUpload)}
+              className={`p-2 rounded-lg transition-colors ${
+                showFileUpload
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Gérer les documents"
+            >
+              <Paperclip className="w-4 h-4 lg:w-5 lg:h-5" />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,4 @@
-import React from 'react';
-import { MessageCircle, Plus, Calendar, Trash2, X } from 'lucide-react';
+import { MessageCircle, Plus, Calendar, Trash2, X, Loader2 } from 'lucide-react';
 import type { Conversation } from '../types';
 
 interface ConversationsListProps {
@@ -10,6 +9,7 @@ interface ConversationsListProps {
   onDeleteConversation: (id: string) => void;
   onClose?: () => void;
   isMobile?: boolean;
+  isLoading?: boolean;
 }
 
 export function ConversationsList({
@@ -19,7 +19,8 @@ export function ConversationsList({
   onCreateConversation,
   onDeleteConversation,
   onClose,
-  isMobile
+  isMobile,
+  isLoading
 }: ConversationsListProps) {
   const sortedConversations = [...conversations].sort(
     (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
@@ -53,7 +54,12 @@ export function ConversationsList({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {sortedConversations.length === 0 ? (
+        {isLoading ? (
+          <div className="p-6 text-center text-gray-500">
+            <Loader2 className="w-8 h-8 mx-auto mb-3 opacity-50 animate-spin" />
+            <p className="text-sm">Chargement des conversations...</p>
+          </div>
+        ) : sortedConversations.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
             <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Aucune conversation</p>

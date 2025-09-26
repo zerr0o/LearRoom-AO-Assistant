@@ -12,8 +12,9 @@ import supabase from './utils/supabase';
 
 function App() {
   const [user, setUser] = useState<{ email: string; isAuthenticated: boolean } | null>(null);
-  const [conversations, setConversations] = useLocalStorage<Conversation[]>('conversations', []);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [settings, setSettings] = useLocalStorage<AppSettings>('settings', { openaiToken: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ conversationId: string; title: string } | null>(null);
@@ -27,12 +28,50 @@ function App() {
   const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
   const [userDocuments, setUserDocuments] = useLocalStorage<UploadedDocument[]>('userDocuments', []);
 
-  const { sendMessage, vectorizeDocument, uploadDocument, syncConversationDocuments, isLoading } = useN8NChat();
+  const { 
+    sendMessage, 
+    vectorizeDocument, 
+    uploadDocument, 
+    getUserConversations,
+    createConversation: createN8NConversation,
+    getConversationHistory, 
+    convertN8NHistoryToMessages,
+    convertN8NConversationsToApp,
+    syncConversationDocuments, 
+    isLoading 
+  } = useN8NChat();
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
 
   const handleAuthSuccess = (email: string) => {
     setUser({ email, isAuthenticated: true });
+    // Charger les conversations après l'authentification
+    loadConversations();
+  };
+
+  // Charger les conversations depuis N8N
+  const loadConversations = async () => {
+    setIsLoadingConversations(true);
+    try {
+      console.log('🔄 Chargement des conversations depuis N8N...');
+      
+      const result = await getUserConversations();
+      
+      if (result.success && result.conversations) {
+        const appConversations = convertN8NConversationsToApp(result.conversations);
+        setConversations(appConversations);
+        console.log(`✅ ${appConversations.length} conversations chargées`);
+      } else if (result.error) {
+        console.warn('⚠️ Erreur lors du chargement des conversations:', result.error);
+        // En cas d'erreur, on garde un tableau vide
+        setConversations([]);
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des conversations:', error);
+      setConversations([]);
+    } finally {
+      setIsLoadingConversations(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -40,26 +79,50 @@ function App() {
       await supabase.auth.signOut();
     } finally {
       setUser(null);
+      setConversations([]);
+      setActiveConversationId(null);
     }
   };
 
-  const createConversation = () => {
-    const newConversation: Conversation = {
-      id: Date.now().toString(),
-      title: `Conversation ${conversations.length + 1}`,
-      messages: [],
-      documents: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+  const createConversation = async () => {
+    try {
+      console.log('➕ Création d\'une nouvelle conversation...');
+      
+      const result = await createN8NConversation('Nouvelle conversation');
+      
+      if (result.success && result.conversationId) {
+        const newConversation: Conversation = {
+          id: result.conversationId,
+          title: 'Nouvelle conversation',
+          messages: [],
+          documents: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
 
-    setConversations(prev => [newConversation, ...prev]);
-    setActiveConversationId(newConversation.id);
+        setConversations(prev => [newConversation, ...prev]);
+        setActiveConversationId(newConversation.id);
+        
+        console.log('✅ Conversation créée:', result.conversationId);
+      } else {
+        throw new Error(result.error || 'Erreur lors de la création de la conversation');
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la conversation:', error);
+      alert('Erreur lors de la création de la conversation. Veuillez réessayer.');
+    }
   };
 
   const selectConversation = (id: string) => {
     setActiveConversationId(id);
     setIsMobileMenuOpen(false);
+    
+    // Synchroniser l'historique de la conversation sélectionnée
+    const selectedConversation = conversations.find(c => c.id === id);
+    if (selectedConversation && selectedConversation.messages.length === 0) {
+      // Synchroniser seulement si la conversation locale est vide
+      syncConversationHistory(id);
+    }
   };
 
   const deleteConversation = (id: string) => {
@@ -395,6 +458,62 @@ function App() {
     setUserDocuments(prev => prev.filter(doc => doc.id !== documentId));
   };
 
+  // Fonction pour synchroniser manuellement l'historique
+  const handleSyncHistory = async (conversationId: string) => {
+    await syncConversationHistory(conversationId);
+  };
+
+  // Synchroniser l'historique de conversation avec N8N
+  const syncConversationHistory = async (conversationId: string) => {
+    try {
+      console.log('🔄 Synchronisation de l\'historique pour:', conversationId);
+      
+      const historyResult = await getConversationHistory(conversationId);
+      
+      if (historyResult.success && historyResult.messages && historyResult.messages.length > 0) {
+        const convertedMessages = convertN8NHistoryToMessages(historyResult.messages);
+        
+        // Mettre à jour la conversation avec l'historique récupéré
+        setConversations(prev =>
+          prev.map(c =>
+            c.id === conversationId
+              ? { 
+                  ...c, 
+                  messages: convertedMessages, // Toujours remplacer les messages par ceux de N8N
+                  updatedAt: new Date()
+                }
+              : c
+          )
+        );
+        
+        console.log(`✅ Historique synchronisé: ${historyResult.messagesCount} paires de messages`);
+      } else if (historyResult.error) {
+        console.warn('⚠️ Erreur lors de la synchronisation:', historyResult.error);
+      } else {
+        console.log('ℹ️ Aucun historique trouvé pour cette conversation');
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation de l\'historique:', error);
+    }
+  };
+
+  // Charger les conversations au démarrage si l'utilisateur est connecté
+  useEffect(() => {
+    const checkAuthAndLoadConversations = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          setUser({ email: session.user.email, isAuthenticated: true });
+          await loadConversations();
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification de l\'authentification:', error);
+      }
+    };
+
+    checkAuthAndLoadConversations();
+  }, []);
+
   useEffect(() => {
     if (activeConversation && activeConversation.vectorStoreId) {
       syncConversationDocuments(activeConversation).then((syncedDocs: UploadedDocument[]) => {
@@ -407,9 +526,11 @@ function App() {
             )
           );
         }
+      }).catch(error => {
+        console.error('Erreur lors de la synchronisation des documents:', error);
       });
     }
-  }, [activeConversation?.id, syncConversationDocuments]);
+  }, [activeConversation?.id, activeConversation?.vectorStoreId]);
 
   // Supabase auth session handling
   useEffect(() => {
@@ -469,6 +590,7 @@ function App() {
           onDeleteConversation={deleteConversation}
           onClose={() => setIsMobileMenuOpen(false)}
           isMobile={isMobileMenuOpen}
+          isLoading={isLoadingConversations}
         />
       </div>
 
@@ -510,6 +632,7 @@ function App() {
           onSendMessage={handleSendMessage}
           onUploadFile={handleFileUpload}
           onUploadFiles={handleFilesUpload}
+          onSyncHistory={handleSyncHistory}
           isLoading={isLoading}
           isUploading={isUploading}
           uploadProgress={uploadProgress}
