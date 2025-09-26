@@ -33,10 +33,12 @@ function App() {
     vectorizeDocument, 
     uploadDocument, 
     getUserConversations,
+    getUserDocuments,
     createConversation: createN8NConversation,
     getConversationHistory, 
     convertN8NHistoryToMessages,
     convertN8NConversationsToApp,
+    convertN8NDocumentsToApp,
     syncConversationDocuments, 
     isLoading 
   } = useN8NChat();
@@ -45,7 +47,7 @@ function App() {
 
   const handleAuthSuccess = (email: string) => {
     setUser({ email, isAuthenticated: true });
-    // Charger les conversations après l'authentification
+    // Charger les conversations et documents après l'authentification
     loadConversations();
   };
 
@@ -55,14 +57,28 @@ function App() {
     try {
       console.log('🔄 Chargement des conversations depuis N8N...');
       
-      const result = await getUserConversations();
+      // Charger les conversations et les documents en parallèle
+      const [conversationsResult, documentsResult] = await Promise.all([
+        getUserConversations(),
+        getUserDocuments()
+      ]);
       
-      if (result.success && result.conversations) {
-        const appConversations = convertN8NConversationsToApp(result.conversations);
+      if (conversationsResult.success && conversationsResult.conversations) {
+        // Passer les documents aux conversations pour l'association
+        const allDocuments = documentsResult.success ? documentsResult.documents : [];
+        const appConversations = convertN8NConversationsToApp(conversationsResult.conversations, allDocuments);
         setConversations(appConversations);
-        console.log(`✅ ${appConversations.length} conversations chargées`);
-      } else if (result.error) {
-        console.warn('⚠️ Erreur lors du chargement des conversations:', result.error);
+        console.log(`✅ ${appConversations.length} conversations chargées avec documents associés`);
+        
+        // Séparer les documents utilisateur (user_doc) pour le state userDocuments
+        if (documentsResult.success && documentsResult.documents) {
+          const userDocs = documentsResult.documents.filter(doc => doc.document_type === 'user_doc');
+          const appUserDocuments = convertN8NDocumentsToApp(userDocs);
+          setUserDocuments(appUserDocuments);
+          console.log(`✅ ${appUserDocuments.length} documents utilisateur chargés`);
+        }
+      } else if (conversationsResult.error) {
+        console.warn('⚠️ Erreur lors du chargement des conversations:', conversationsResult.error);
         // En cas d'erreur, on garde un tableau vide
         setConversations([]);
       }
@@ -73,6 +89,7 @@ function App() {
       setIsLoadingConversations(false);
     }
   };
+
 
   const handleLogout = async () => {
     try {

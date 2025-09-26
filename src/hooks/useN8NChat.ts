@@ -233,6 +233,85 @@ ${documentType === 'user_doc'
     return uploadDocument(file, 'project_doc', conversationId);
   };
 
+  // Récupérer tous les documents d'un utilisateur depuis N8N
+  const getUserDocuments = async (): Promise<{ success: boolean; documents?: any[]; error?: string }> => {
+    try {
+      // Récupérer l'ID de session Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionId = session?.user?.id;
+      
+      if (!sessionId) {
+        throw new Error('Session utilisateur non trouvée. Veuillez vous reconnecter.');
+      }
+
+      const url = `https://n8n.srv1030728.hstgr.cloud/webhook/get-user-documents?sessionId=${encodeURIComponent(sessionId)}`;
+      console.log('📄 Récupération des documents utilisateur:', sessionId);
+      console.log('🔗 URL appelée:', url);
+
+      // Faire la requête pour récupérer les documents (GET pour éviter CORS preflight)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+
+      console.log('📊 Status de la réponse:', response.status, response.statusText);
+      console.log('📋 Headers de réponse:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        throw new Error(`Erreur API N8N: ${response.status} ${response.statusText}`);
+      }
+
+      // Vérifier si la réponse a du contenu
+      const responseText = await response.text();
+      console.log('📄 Réponse brute N8N documents:', responseText);
+      console.log('📏 Taille de la réponse:', responseText.length, 'caractères');
+      
+      if (!responseText || responseText.trim() === '') {
+        console.log('ℹ️ Réponse vide - aucun document trouvé');
+        return {
+          success: true,
+          documents: []
+        };
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Erreur parsing JSON:', parseError);
+        console.error('📄 Contenu de la réponse:', responseText);
+        throw new Error(`Réponse JSON invalide: ${parseError instanceof Error ? parseError.message : 'Erreur de parsing'}`);
+      }
+      
+      console.log('✅ Documents récupérés:', data);
+      
+      // La réponse peut être soit un tableau direct, soit un objet avec une propriété documents
+      let documents = [];
+      
+      if (Array.isArray(data)) {
+        // Si c'est déjà un tableau
+        documents = data;
+      } else if (data.documents && Array.isArray(data.documents)) {
+        // Si c'est un objet avec une propriété documents
+        documents = data.documents;
+      }
+      
+      return {
+        success: true,
+        documents: documents
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des documents:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la récupération des documents'
+      };
+    }
+  };
+
   // Récupérer toutes les conversations d'un utilisateur depuis N8N
   const getUserConversations = async (): Promise<{ success: boolean; conversations?: any[]; error?: string }> => {
     try {
@@ -377,26 +456,34 @@ ${documentType === 'user_doc'
     }
   };
 
+  // Générer un ID unique pour les messages
+  const generateUniqueMessageId = (role: 'user' | 'assistant', index: number, conversationId?: string): string => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    const convId = conversationId ? conversationId.substring(0, 8) : 'default';
+    return `${role}-${convId}-${index}-${timestamp}-${random}`;
+  };
+
   // Convertir l'historique N8N au format de l'application
-  const convertN8NHistoryToMessages = (n8nMessages: Array<{ human: string; ai: string }>): Message[] => {
+  const convertN8NHistoryToMessages = (n8nMessages: Array<{ human: string; ai: string }>, conversationId?: string): Message[] => {
     const messages: Message[] = [];
     const baseTimestamp = Date.now();
     
     n8nMessages.forEach((msgPair, index) => {
-      // Message utilisateur - ID unique avec index et offset
+      // Message utilisateur - ID vraiment unique
       messages.push({
-        id: `user-${index}-${baseTimestamp}-${index * 2}`,
+        id: generateUniqueMessageId('user', index, conversationId),
         content: msgPair.human,
         role: 'user',
-        timestamp: new Date(baseTimestamp + index * 2)
+        timestamp: new Date(baseTimestamp + index * 1000) // Espacement de 1 seconde
       });
       
-      // Message assistant - ID unique avec index et offset différent
+      // Message assistant - ID vraiment unique
       messages.push({
-        id: `assistant-${index}-${baseTimestamp}-${index * 2 + 1}`,
+        id: generateUniqueMessageId('assistant', index, conversationId),
         content: msgPair.ai,
         role: 'assistant',
-        timestamp: new Date(baseTimestamp + index * 2 + 1)
+        timestamp: new Date(baseTimestamp + index * 1000 + 500) // +500ms après le message utilisateur
       });
     });
     
@@ -404,15 +491,43 @@ ${documentType === 'user_doc'
   };
 
   // Convertir les conversations N8N au format de l'application
-  const convertN8NConversationsToApp = (n8nConversations: any[]): Conversation[] => {
-    return n8nConversations.map((n8nConv) => ({
-      id: n8nConv.id || n8nConv.conversationId,
-      title: n8nConv.title || 'Nouvelle conversation',
-      messages: n8nConv.messages ? convertN8NHistoryToMessages(n8nConv.messages) : [],
-      createdAt: n8nConv.created_at ? new Date(n8nConv.created_at) : (n8nConv.createdAt ? new Date(n8nConv.createdAt) : new Date()),
-      updatedAt: n8nConv.updated_at ? new Date(n8nConv.updated_at) : (n8nConv.updatedAt ? new Date(n8nConv.updatedAt) : new Date()),
-      documents: n8nConv.documents || [],
-      vectorStoreId: n8nConv.vectorStoreId
+  const convertN8NConversationsToApp = (n8nConversations: any[], allDocuments?: any[]): Conversation[] => {
+    return n8nConversations.map((n8nConv) => {
+      const conversationId = n8nConv.id || n8nConv.conversationId;
+      
+      // Trouver les documents associés à cette conversation
+      let conversationDocuments: UploadedDocument[] = [];
+      if (allDocuments) {
+        const projectDocs = allDocuments.filter(doc => 
+          doc.conversation_id === conversationId && 
+          doc.document_type === 'project_doc'
+        );
+        conversationDocuments = convertN8NDocumentsToApp(projectDocs);
+      }
+      
+      return {
+        id: conversationId,
+        title: n8nConv.title || 'Nouvelle conversation',
+        messages: n8nConv.messages ? convertN8NHistoryToMessages(n8nConv.messages) : [],
+        createdAt: n8nConv.created_at ? new Date(n8nConv.created_at) : (n8nConv.createdAt ? new Date(n8nConv.createdAt) : new Date()),
+        updatedAt: n8nConv.updated_at ? new Date(n8nConv.updated_at) : (n8nConv.updatedAt ? new Date(n8nConv.updatedAt) : new Date()),
+        documents: conversationDocuments,
+        vectorStoreId: n8nConv.vectorStoreId
+      };
+    });
+  };
+
+  // Convertir les documents N8N au format de l'application
+  const convertN8NDocumentsToApp = (n8nDocuments: any[]): UploadedDocument[] => {
+    return n8nDocuments.map((n8nDoc) => ({
+      id: n8nDoc.uuid || n8nDoc.id,
+      name: n8nDoc.document_name || n8nDoc.name,
+      size: n8nDoc.size || 0,
+      uploadedAt: n8nDoc.created_at ? new Date(n8nDoc.created_at) : new Date(),
+      vectorized: true, // Assumons que les documents N8N sont vectorisés
+      documentType: n8nDoc.document_type as 'project_doc' | 'user_doc',
+      fileId: n8nDoc.uuid || n8nDoc.id,
+      content: `Document ${n8nDoc.document_name || 'sans nom'} (${Math.round((n8nDoc.size || 0) / 1024)} KB)`
     }));
   };
 
@@ -427,10 +542,12 @@ ${documentType === 'user_doc'
     vectorizeDocument,
     uploadDocument,
     getUserConversations,
+    getUserDocuments,
     createConversation,
     getConversationHistory,
     convertN8NHistoryToMessages,
     convertN8NConversationsToApp,
+    convertN8NDocumentsToApp,
     syncConversationDocuments,
     isLoading
   };
